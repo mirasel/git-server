@@ -65,8 +65,6 @@ func (a app) Fetch(repo string, key ssh.PublicKey) {
 
 func isKeyAuthorized(repo string, key ssh.PublicKey) bool {
 	marshaledKey := string(gossh.MarshalAuthorizedKey(key))
-	fmt.Println("Repo:", repo)
-	fmt.Println("Key:", marshaledKey)
 	resp, err := http.Get(fmt.Sprintf("%s/%s", authServer, repo))
 	if err != nil {
 		log.Error("failed to fetch authorized keys", "error", err)
@@ -90,14 +88,10 @@ func isKeyAuthorized(repo string, key ssh.PublicKey) bool {
 		log.Error("failed to convert into json key", "error", err)
 		return false
 	}
-	fmt.Println("AuthKeys:", authKeys)
 
 	for _, authKey := range authKeys {
 		keyPart := strings.Split(authKey.Key, " ")
 		keyWithoutUserIdentity := strings.Join(keyPart[0:len(keyPart)-1], " ")
-		fmt.Println("keyWithoutUserIdentity:", keyWithoutUserIdentity)
-		fmt.Println("marshaledKey:", marshaledKey)
-		fmt.Println("match:", strings.TrimSpace(keyWithoutUserIdentity) == strings.TrimSpace(marshaledKey))
 		if strings.TrimSpace(keyWithoutUserIdentity) == strings.TrimSpace(marshaledKey) {
 			return true
 		}
