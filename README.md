@@ -26,7 +26,7 @@ A lightweight SSH-based Git server built with [Charmbracelet's Wish](https://git
 ```txt
 .
 ├── main.go             # Main server logic
-├── .repos/             # Where Git repos are stored
+├── repos/             # Where Git repos are stored
 ├── repo_backups/       # Where commit zip backups are saved
 ├── .ssh/id_ed25519     # Host SSH private key (generated if missing)
 ```
@@ -112,7 +112,7 @@ In `main.go`:
 const (
   port       = "2222"
   host       = "0.0.0.0"
-  repoDir    = ".repos"
+  repoDir    = "repos"
   backupDir  = "repo_backups"
   authServer = "http://your-auth-server.local/api/authorized_keys"
 )
@@ -122,7 +122,7 @@ const (
 
 ## 📁 Directory Overview
 
--   `.repos/` — All Git repositories live here.
+-   `repos/` — All Git repositories live here.
 -   `repo_backups/` — Compressed `.zip` backups of each pushed commit.
 -   `.ssh/id_ed25519` — SSH private key used to identify the server to clients.
 
