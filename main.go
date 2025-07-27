@@ -35,9 +35,7 @@ const (
 	authServer = "http://0.0.0.0:3000"
 )
 
-type app struct {
-	access git.AccessLevel
-}
+type app struct{}
 
 type authorizedKey struct {
 	ID  string `json:"id"`
