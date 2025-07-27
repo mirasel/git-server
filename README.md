@@ -143,7 +143,7 @@ const (
 Built using:
 
 -   [Charmbracelet Wish](https://github.com/charmbracelet/wish)
--   [Gliderlabs SSH]("https://github.com/charmbracelet/ssh")
+-   [Charmbracelet SSH](https://github.com/charmbracelet/ssh)
 
 ---
 
