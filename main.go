@@ -1,8 +1,6 @@
 package main
 
 import (
-	"archive/zip"
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -44,6 +42,17 @@ type authorizedKey struct {
 
 func (a app) AuthRepo(repo string, key ssh.PublicKey) git.AccessLevel {
 	if isKeyAuthorized(repo, key) {
+		repoPath := filepath.Join(repoDir, repo)
+		// Auto-create bare repo if not exists
+		if _, err := os.Stat(repoPath); os.IsNotExist(err) {
+			log.Info("Repo not found. Creating new bare repo...", "repo", repo)
+
+			err := createBareRepoWithHook(repo)
+			if err != nil {
+				log.Error("failed to create repo", "repo", repo, "error", err)
+				return git.NoAccess
+			}
+		}
 		return git.ReadWriteAccess
 	}
 	return git.NoAccess
@@ -51,10 +60,6 @@ func (a app) AuthRepo(repo string, key ssh.PublicKey) git.AccessLevel {
 
 func (a app) Push(repo string, key ssh.PublicKey) {
 	log.Info("push", "repo", repo)
-	commitSha := getLatestCommitSHA(repo)
-	if commitSha != "" {
-		backupRepo(repo, commitSha)
-	}
 }
 
 func (a app) Fetch(repo string, key ssh.PublicKey) {
@@ -101,57 +106,6 @@ func isKeyAuthorized(repo string, key ssh.PublicKey) bool {
 	return false
 }
 
-func getLatestCommitSHA(repo string) string {
-	repoPath := filepath.Join(repoDir, repo)
-	cmd := exec.Command("git", "--git-dir", repoPath, "rev-parse", "HEAD")
-	output, err := cmd.Output()
-	if err != nil {
-		log.Error("failed to get commit sha", "error", err)
-		return ""
-	}
-	return strings.TrimSpace(string(output))
-}
-
-func backupRepo(repo, sha string) {
-	src := filepath.Join(repoDir, repo)
-	destDir := filepath.Join(backupDir, repo)
-	os.MkdirAll(destDir, 0755)
-
-	zipFile := filepath.Join(destDir, fmt.Sprintf("%s.zip", sha))
-	f, err := os.Create(zipFile)
-	if err != nil {
-		log.Error("could not create zip file", "error", err)
-		return
-	}
-	defer f.Close()
-
-	w := zip.NewWriter(f)
-	defer w.Close()
-
-	filepath.Walk(src, func(path string, info fs.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		relPath, err := filepath.Rel(src, path)
-		if err != nil {
-			return err
-		}
-		if info.IsDir() {
-			return nil
-		}
-		fileData, err := os.ReadFile(path)
-		if err != nil {
-			return err
-		}
-		f, err := w.Create(relPath)
-		if err != nil {
-			return err
-		}
-		_, err = io.Copy(f, bytes.NewReader(fileData))
-		return err
-	})
-}
-
 func gitListMiddleware(next ssh.Handler) ssh.Handler {
 	return func(sess ssh.Session) {
 		if len(sess.Command()) != 0 {
@@ -177,6 +131,42 @@ func gitListMiddleware(next ssh.Handler) ssh.Handler {
 	}
 }
 
+func createBareRepoWithHook(repoName string) error {
+	repoPath := filepath.Join(repoDir, repoName)
+
+	// Create the bare repo
+	if err := os.MkdirAll(repoPath, 0755); err != nil {
+		return err
+	}
+	cmd := exec.Command("git", "init", "--bare", repoPath)
+	if err := cmd.Run(); err != nil {
+		return err
+	}
+
+	// Write post-receive hook
+	hookPath := filepath.Join(repoPath, "hooks", "post-receive")
+	hookScript := `#!/bin/bash
+	BACKUP_ROOT="` + `../../` + backupDir + `"
+	REPO_NAME=$(basename "$(pwd)" .git)
+
+	while read oldrev newrev refname; do
+		ZIP_NAME="$newrev.zip"
+		DEST_DIR="$BACKUP_ROOT/$REPO_NAME"
+		DEST_PATH="$DEST_DIR/$ZIP_NAME"
+
+		mkdir -p "$DEST_DIR"
+		git archive "$newrev" --format zip -o "$DEST_PATH"
+
+		echo "$oldrev -> $newrev $refname"
+	done
+	`
+
+	if err := os.WriteFile(hookPath, []byte(hookScript), 0755); err != nil {
+		return err
+	}
+	return nil
+}
+
 func main() {
 	a := app{}
 
@@ -188,7 +178,7 @@ func main() {
 		}),
 		wish.WithMiddleware(
 			git.Middleware(repoDir, a),
-			gitListMiddleware,
+			// gitListMiddleware,
 			logging.Middleware(),
 		),
 	)
