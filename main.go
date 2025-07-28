@@ -156,8 +156,6 @@ func createBareRepoWithHook(repoName string) error {
 
 		mkdir -p "$DEST_DIR"
 		git archive "$newrev" --format zip -o "$DEST_PATH"
-
-		echo "$oldrev -> $newrev $refname"
 	done
 	`
 
