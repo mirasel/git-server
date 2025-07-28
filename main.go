@@ -148,6 +148,31 @@ func backupRepo(repo, sha string) {
 	})
 }
 
+func gitListMiddleware(next ssh.Handler) ssh.Handler {
+	return func(sess ssh.Session) {
+		if len(sess.Command()) != 0 {
+			next(sess)
+			return
+		}
+		dest, err := os.ReadDir(repoDir)
+		if err != nil && err != fs.ErrNotExist {
+			log.Error("invalid repository", "error", err)
+		}
+		if len(dest) > 0 {
+			fmt.Fprintf(sess, "\n### Repo Menu ###\n\n")
+		}
+		for _, dir := range dest {
+			fmt.Fprintf(sess, "• %s\n", dir.Name())
+			fmt.Fprintf(sess, "git clone ssh://%s/%s\n", net.JoinHostPort(host, port), dir.Name())
+		}
+		fmt.Fprintf(sess, "\n\n### Add some repos! ###\n\n")
+		fmt.Fprintf(sess, "> cd some_repo\n")
+		fmt.Fprintf(sess, "> git remote add wish_test ssh://%s/some_repo\n", net.JoinHostPort(host, port))
+		fmt.Fprintf(sess, "> git push wish_test\n\n\n")
+		next(sess)
+	}
+}
+
 func main() {
 	a := app{}
 
@@ -179,39 +204,4 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	s.Shutdown(ctx)
-}
-
-func gitListMiddleware(next ssh.Handler) ssh.Handler {
-	return func(sess ssh.Session) {
-		if len(sess.Command()) != 0 {
-			next(sess)
-			return
-		}
-		dest, err := os.ReadDir(repoDir)
-		if err != nil && err != fs.ErrNotExist {
-			log.Error("invalid repository", "error", err)
-		}
-		if len(dest) > 0 {
-			fmt.Fprintf(sess, "\n### Repo Menu ###\n\n")
-		}
-		for _, dir := range dest {
-			fmt.Fprintf(sess, "• %s\n", dir.Name())
-			fmt.Fprintf(sess, "git clone ssh://%s/%s\n", net.JoinHostPort(host, port), dir.Name())
-		}
-		fmt.Fprintf(sess, "\n\n### Add some repos! ###\n\n")
-		fmt.Fprintf(sess, "> cd some_repo\n")
-		fmt.Fprintf(sess, "> git remote add wish_test ssh://%s/some_repo\n", net.JoinHostPort(host, port))
-		fmt.Fprintf(sess, "> git push wish_test\n\n\n")
-		next(sess)
-	}
-}
-
-func extractRepoFromCommand(cmd []string) string {
-	for _, arg := range cmd {
-		if strings.Contains(arg, ".git") {
-			parts := strings.Split(arg, "/")
-			return strings.TrimSuffix(parts[len(parts)-1], ".git")
-		}
-	}
-	return ""
 }
