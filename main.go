@@ -61,6 +61,10 @@ func (a app) Fetch(repo string, key ssh.PublicKey) {
 	log.Info("fetch", "repo", repo)
 }
 
+func (a app) Pull(repo string, key ssh.PublicKey) {
+	log.Info("pull", "repo", repo)
+}
+
 func isKeyAuthorized(repo string, key ssh.PublicKey) bool {
 	marshaledKey := string(gossh.MarshalAuthorizedKey(key))
 	resp, err := http.Get(fmt.Sprintf("%s/%s", authServer, repo))
