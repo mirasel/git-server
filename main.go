@@ -26,11 +26,11 @@ import (
 )
 
 const (
-	port       = "2222"
-	host       = "0.0.0.0"
-	repoDir    = "repos"
-	backupDir  = "repo_backups"
-	authServer = "http://0.0.0.0:3000"
+	port           = "2222"
+	host           = "0.0.0.0"
+	repoDir        = "repos"
+	backupDir      = "repo_backups"
+	internalServer = "http://0.0.0.0:3000"
 )
 
 type app struct{}
@@ -72,7 +72,7 @@ func (a app) Pull(repo string, key ssh.PublicKey) {
 
 func isKeyAuthorized(repo string, key ssh.PublicKey) bool {
 	marshaledKey := string(gossh.MarshalAuthorizedKey(key))
-	resp, err := http.Get(fmt.Sprintf("%s/%s", authServer, repo))
+	resp, err := http.Get(fmt.Sprintf("%s/%s", internalServer, repo))
 	if err != nil {
 		log.Error("failed to fetch authorized keys", "error", err)
 		return false
@@ -146,8 +146,9 @@ func createBareRepoWithHook(repoName string) error {
 	// Write post-receive hook
 	hookPath := filepath.Join(repoPath, "hooks", "post-receive")
 	hookScript := `#!/bin/bash
-	BACKUP_ROOT="` + `../../` + backupDir + `"
+	BACKUP_ROOT="` + "../../" + backupDir + `"
 	REPO_NAME=$(basename "$(pwd)" .git)
+	UPLOAD_URL="` + internalServer + `/upload"
 
 	while read oldrev newrev refname; do
 		ZIP_NAME="$newrev.zip"
@@ -156,6 +157,13 @@ func createBareRepoWithHook(repoName string) error {
 
 		mkdir -p "$DEST_DIR"
 		git archive "$newrev" --format zip -o "$DEST_PATH"
+
+		# Upload via curl as multipart/form-data
+		curl -X POST "$UPLOAD_URL" \
+			-F "repo=$REPO_NAME" \
+			-F "commit=$newrev" \
+			-F "file=@$DEST_PATH" \
+			--fail --silent --show-error
 	done
 	`
 
