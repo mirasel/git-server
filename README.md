@@ -1,6 +1,6 @@
 # Wish Git Server
 
-A lightweight SSH-based Git server built with [Charmbracelet's Wish](https://github.com/charmbracelet/wish) and the `git` middleware. This project allows multiple users to interact with Git repositories over SSH, with customizable authentication and automatic commit backup functionality.
+A lightweight SSH-based Git server built with [Charmbracelet&#39;s Wish](https://github.com/charmbracelet/wish) and the `git` middleware. This project allows multiple users to interact with Git repositories over SSH, with customizable authentication and automatic commit backup functionality.
 
 ---
 
@@ -17,6 +17,7 @@ A lightweight SSH-based Git server built with [Charmbracelet's Wish](https://git
     -   Every time a user pushes to a repo, the latest commit is zipped and stored in a local backup directory using the commit SHA as the filename.
 
 -   🗂️ **Repo Listing in SSH**
+
     -   When a user connects without a Git command, the server lists available repositories and provides cloning instructions.
 
 ---
@@ -26,7 +27,8 @@ A lightweight SSH-based Git server built with [Charmbracelet's Wish](https://git
 ```txt
 .
 ├── main.go             # Main server logic
-├── repos/             # Where Git repos are stored
+├── config.go           # Configuration management
+├── repos/              # Where Git repos are stored
 ├── repo_backups/       # Where commit zip backups are saved
 ├── .ssh/id_ed25519     # Host SSH private key (generated if missing)
 ```
@@ -41,7 +43,7 @@ Each repo has its own list of authorized public keys. When a user attempts any G
 2. Makes an HTTP GET request to:
 
     ```
-    http://your-auth-server.local/api/authorized_keys/<repo>
+    http://your-auth-server.local/<repo>
     ```
 
 3. Compares the client's SSH key against the returned public keys.
@@ -54,7 +56,7 @@ Each repo has its own list of authorized public keys. When a user attempts any G
 When a user performs a `git push`, the server:
 
 1. Extracts the latest commit SHA from the repo.
-2. Compresses the entire `.git` directory of that repo into a zip file.
+2. Compresses the latest codes of that repo into a zip file.
 3. Saves it at:
 
     ```
@@ -84,38 +86,41 @@ git commit -m "Initial commit"
 git push origin master
 ```
 
----
-
 ## 🛠️ Setup
 
 ### 1. Generate SSH Host Key
 
 ```sh
-ssh-keygen -t ed25519 -C "your_email@example.com"
+mkdir -p .ssh
+ssh-keygen -t ed25519 -f .ssh/id_ed25519 -N ""
 ```
 
 ### 2. Run the Server
 
 ```sh
-go run main.go
+go run *.go
 ```
 
-The server listens on `0.0.0.0:2222`.
+The server listens on `0.0.0.0:2222` by default.
 
 ---
 
-## 🧩 Configurable Constants
+## ⚙️ Configuration
 
-In `main.go`:
+The server can be configured using environment variables:
 
-```go
-const (
-  port       = "2222"
-  host       = "0.0.0.0"
-  repoDir    = "repos"
-  backupDir  = "repo_backups"
-  authServer = "http://your-auth-server.local/api/authorized_keys"
-)
+```sh
+# Server settings
+export GIT_SERVER_PORT="2222"                    # Default: 2222
+export GIT_SERVER_HOST="0.0.0.0"                 # Default: 0.0.0.0
+export GIT_SERVER_REPO_DIR="repos"               # Default: repos
+export GIT_SERVER_BACKUP_DIR="repo_backups"      # Default: repo_backups
+export GIT_SERVER_AUTHORIZATION_SERVER_URL="http://0.0.0.0:3000"  # Default: http://0.0.0.0:3000
+export GIT_SERVER_HTTP_TIMEOUT="10"              # Default: 10 seconds
+export GIT_SERVER_SSH_KEY_PATH=".ssh/id_ed25519" # Default: .ssh/id_ed25519
+
+# Run with custom config
+go run *.go
 ```
 
 ---
@@ -144,11 +149,3 @@ Built using:
 
 -   [Charmbracelet Wish](https://github.com/charmbracelet/wish)
 -   [Charmbracelet SSH](https://github.com/charmbracelet/ssh)
-
----
-
-## 🚧 Future Improvements
-
--   Add user-friendly web UI for repo browsing and key management
--   Webhooks or post-receive Git hooks
--   Fine-grained repo permission control (read vs write)
