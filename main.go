@@ -215,7 +215,7 @@ func main() {
 		}),
 		wish.WithMiddleware(
 			git.Middleware(config.RepoDir, a),
-			gitListMiddleware,
+			// gitListMiddleware, // uncomment to see SSH interface, (basically available repos and clone instructions)
 			logging.Middleware(),
 		),
 	)
